@@ -35,7 +35,7 @@ class FieldTypeGuesser(object):
         if isinstance(field, URLField): return lambda x: generator.uri()
         if isinstance(field, SlugField): return lambda x: generator.slug()
         if isinstance(field, IPAddressField):
-            protocolIp = generator.randomElements(['ipv4','ipv6'])
+            protocolIp = generator.randomElement(['ipv4','ipv6'])
             return lambda x: getattr(generator,protocolIp)()
         if isinstance(field, EmailField): return lambda x: generator.email()
         if isinstance(field, ImageField): return lambda x: None
