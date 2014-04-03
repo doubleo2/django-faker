@@ -1,7 +1,9 @@
 import random
 from django_faker.guessers import Name
+from django.conf import settings
 from django.db.models.fields import *
-from django.db.models import ForeignKey, ManyToManyField, OneToOneField, ImageField
+from django.db.models import (ForeignKey, ManyToManyField, OneToOneField,
+                              ImageField)
 
 
 class FieldTypeGuesser(object):
@@ -15,30 +17,47 @@ class FieldTypeGuesser(object):
     def guessFormat(self, field):
 
         generator = self.generator
-        if isinstance(field, BooleanField): return lambda x: generator.boolean()
-        if isinstance(field, NullBooleanField): return lambda x: generator.nullBoolean()
-        if isinstance(field, DecimalField): return lambda x: generator.pydecimal(rightDigits=field.decimal_places)
-        if isinstance(field, SmallIntegerField): return lambda x: generator.randomInt(0,65535)
-        if isinstance(field, IntegerField): return lambda x: generator.randomInt(0,4294967295)
-        if isinstance(field, BigIntegerField): return lambda x: generator.randomInt(0,18446744073709551615)
-        if isinstance(field, FloatField): return lambda x: generator.pyfloat()
+        if isinstance(field, BooleanField):
+            return lambda x: generator.boolean()
+        if isinstance(field, NullBooleanField):
+            return lambda x: generator.nullBoolean()
+        if isinstance(field, DecimalField):
+            return lambda x: generator.pydecimal(
+                rightDigits=field.decimal_places)
+        if isinstance(field, SmallIntegerField) or \
+           isinstance(field, PositiveSmallIntegerField):
+            return lambda x: generator.randomInt(0, 32767)
+        if isinstance(field, IntegerField):
+            return lambda x: generator.randomInt(0, 2147483647)
+        if isinstance(field, BigIntegerField):
+            return lambda x: generator.randomInt(0, 18446744073709551615)
+        if isinstance(field, FloatField):
+            return lambda x: generator.pyfloat()
         if isinstance(field, CharField):
             if field.choices:
                 return lambda x: generator.randomElement(field.choices)[0]
-            return lambda x: generator.text(field.max_length) if field.max_length >= 5 else generator.word()
-        if isinstance(field, TextField): return lambda x: generator.text()
+            return lambda x: generator.text(field.max_length) if \
+                field.max_length >= 5 else generator.word()
+        if isinstance(field, TextField):
+            return lambda x: generator.text()
 
-        if isinstance(field, DateTimeField): return lambda x: generator.dateTime()
-        if isinstance(field, DateField): return lambda x: generator.date()
-        if isinstance(field, TimeField): return lambda x: generator.time()
-
-        if isinstance(field, URLField): return lambda x: generator.uri()
-        if isinstance(field, SlugField): return lambda x: generator.slug()
+        if isinstance(field, DateTimeField):
+            return lambda x: generator.dateTime()
+        if isinstance(field, DateField):
+            return lambda x: generator.date()
+        if isinstance(field, TimeField):
+            return lambda x: generator.time()
+        if isinstance(field, URLField):
+            return lambda x: generator.uri()
+        if isinstance(field, SlugField):
+            return lambda x: generator.slug()
         if isinstance(field, IPAddressField):
-            protocolIp = generator.randomElements(['ipv4','ipv6'])
-            return lambda x: getattr(generator,protocolIp)()
-        if isinstance(field, EmailField): return lambda x: generator.email()
-        if isinstance(field, ImageField): return lambda x: None
+            protocolIp = generator.randomElements(['ipv4', 'ipv6'])
+            return lambda x: getattr(generator, protocolIp)()
+        if isinstance(field, EmailField):
+            return lambda x: generator.email()
+        if isinstance(field, ImageField):
+            return lambda x: None
 
         raise AttributeError(field)
 
@@ -62,23 +81,28 @@ class ModelPopulator(object):
         #            yield field.name, getattr(self, field.name)
             fieldName = field.name
 
-            if formatters.has_key(fieldName):
+            if fieldName in formatters:
                 continue
 
-            if isinstance(field, (ForeignKey,ManyToManyField,OneToOneField)):
+            if isinstance(field, (ForeignKey, ManyToManyField, OneToOneField)):
                 relatedModel = field.rel.to
 
                 def build_relation(inserted):
                     if relatedModel in inserted and inserted[relatedModel]:
-                        return relatedModel.objects.get(pk=random.choice(inserted[relatedModel]))
+                        return relatedModel.objects.get(
+                            pk=random.choice(
+                                inserted[relatedModel]))
                     if not field.null:
-                        try :
+                        try:
                             # try to retrieve random object from relatedModel
                             relatedModel.objects.order_by('?')[0]
                         except IndexError:
-                            raise Exception('Relation "%s.%s" with "%s" cannot be null, check order of addEntity list' % (
-                                field.model.__name__, field.name, relatedModel.__name__,
-                            ))
+                            raise Exception('Relation "%s.%s" with "%s" '
+                                            'cannot be null, check order of '
+                                            'addEntity list' % (
+                                                field.model.__name__,
+                                                field.name,
+                                                relatedModel.__name__,))
                     return None
 
                 formatters[fieldName] = build_relation
@@ -105,7 +129,8 @@ class ModelPopulator(object):
 
         for field, format in self.fieldFormatters.items():
             if format:
-                value = format(insertedEntities) if hasattr(format,'__call__') else format
+                value = format(insertedEntities) if \
+                    hasattr(format, '__call__') else format
                 setattr(obj, field, value)
 
         obj.save(using=using)
@@ -139,7 +164,9 @@ class Populator(object):
         if not isinstance(model, ModelPopulator):
             model = ModelPopulator(model)
 
-        model.fieldFormatters = model.guessFieldFormatters(self.generator, formatters=customFieldFormatters)
+        model.fieldFormatters = model.guessFieldFormatters(
+            self.generator,
+            formatters=customFieldFormatters)
 
         klass = model.model
         self.entities[klass] = model
@@ -161,8 +188,9 @@ class Populator(object):
             number = self.quantities[klass]
             if klass not in insertedEntities:
                 insertedEntities[klass] = []
-            for i in range(0,number):
-                    insertedEntities[klass].append( self.entities[klass].execute(using, insertedEntities) )
+            for i in range(0, number):
+                    insertedEntities[klass].append(
+                        self.entities[klass].execute(using, insertedEntities))
 
         return insertedEntities
 
@@ -174,10 +202,8 @@ class Populator(object):
 
         klass = self.entities.keys()
         if not klass:
-            raise AttributeError('No class found from entities. Did you add entities to the Populator ?')
+            raise AttributeError('No class found from entities. Did you add '
+                                 'entities to the Populator ?')
         klass = klass[0]
 
         return klass.objects._db
-
-
-
