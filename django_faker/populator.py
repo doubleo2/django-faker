@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db.models.fields import *
 from django.db.models import (ForeignKey, ManyToManyField, OneToOneField,
                               ImageField)
+from django.utils.timezone import utc
 
 
 class FieldTypeGuesser(object):
@@ -42,7 +43,10 @@ class FieldTypeGuesser(object):
             return lambda x: generator.text()
 
         if isinstance(field, DateTimeField):
-            return lambda x: generator.dateTime()
+            if getattr(settings, 'USE_TZ', False):
+                return lambda x: generator.dateTime().replace(tzinfo=utc)
+            else:
+                return lambda x: generator.dateTime()
         if isinstance(field, DateField):
             return lambda x: generator.date()
         if isinstance(field, TimeField):
