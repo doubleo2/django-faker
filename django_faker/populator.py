@@ -52,7 +52,7 @@ class FieldTypeGuesser(object):
         if isinstance(field, SlugField):
             return lambda x: generator.slug()
         if isinstance(field, IPAddressField):
-            protocolIp = generator.randomElements(['ipv4', 'ipv6'])
+            protocolIp = generator.randomElement(['ipv4', 'ipv6'])
             return lambda x: getattr(generator, protocolIp)()
         if isinstance(field, EmailField):
             return lambda x: generator.email()
@@ -95,7 +95,7 @@ class ModelPopulator(object):
                     if not field.null:
                         try:
                             # try to retrieve random object from relatedModel
-                            relatedModel.objects.order_by('?')[0]
+                            return relatedModel.objects.order_by('?')[0]
                         except IndexError:
                             raise Exception('Relation "%s.%s" with "%s" '
                                             'cannot be null, check order of '
