@@ -66,6 +66,34 @@ class FieldTypeGuesser(object):
         raise AttributeError(field)
 
 
+class RelationPopulator(object):
+    def __init__(self, field):
+        """
+        :param field: Related field
+        """
+
+        self.field = field
+
+    def build_relation(self, inserted):
+        relatedModel = self.field.rel.to
+        if relatedModel in inserted and inserted[relatedModel]:
+            return relatedModel.objects.get(
+                pk=random.choice(
+                    inserted[relatedModel]))
+        if not self.field.null:
+            try:
+                # try to retrieve random object from relatedModel
+                return relatedModel.objects.order_by('?')[0]
+            except IndexError:
+                raise Exception('Relation "%s.%s" with "%s" '
+                                'cannot be null, check order of '
+                                'addEntity list' % (
+                                    self.field.model.__name__,
+                                    self.field.name,
+                                    relatedModel.__name__,))
+        return None
+
+
 class ModelPopulator(object):
     def __init__(self, model):
         """
@@ -89,27 +117,9 @@ class ModelPopulator(object):
                 continue
 
             if isinstance(field, (ForeignKey, ManyToManyField, OneToOneField)):
-                relatedModel = field.rel.to
+                rel_populator = RelationPopulator(field)
 
-                def build_relation(inserted):
-                    if relatedModel in inserted and inserted[relatedModel]:
-                        return relatedModel.objects.get(
-                            pk=random.choice(
-                                inserted[relatedModel]))
-                    if not field.null:
-                        try:
-                            # try to retrieve random object from relatedModel
-                            return relatedModel.objects.order_by('?')[0]
-                        except IndexError:
-                            raise Exception('Relation "%s.%s" with "%s" '
-                                            'cannot be null, check order of '
-                                            'addEntity list' % (
-                                                field.model.__name__,
-                                                field.name,
-                                                relatedModel.__name__,))
-                    return None
-
-                formatters[fieldName] = build_relation
+                formatters[fieldName] = rel_populator.build_relation
                 continue
 
             if isinstance(field, AutoField):
